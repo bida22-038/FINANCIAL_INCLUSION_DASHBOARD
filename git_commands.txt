@@ -1,0 +1,46 @@
+1. Navigate to Your Project Directory
+
+Open your terminal and navigate to the directory of your project:
+
+cd /path/to/your/project
+Copy
+2. Initialize Git (If Not Already Initialized)
+
+If your project is not already a Git repository, initialize it:
+
+git init
+Copy
+3. Add Files to Staging Area
+
+Stage all files in your project for the commit:
+
+git add
+Copy
+4. Commit the Changes
+
+Create a commit with a descriptive message:
+
+git commit -m "Initial commit"
+Copy
+5. Link to the Remote Repository
+
+Add the URL of your existing GitHub repository as the remote origin:
+
+git remote add origin https://github.com/<username>/<repository>.git
+Copy
+6. Push Code to GitHub
+
+Push your code to the main branch of the remote repository:
+
+git branch -M main # Rename branch to 'main' if necessary
+git push -u origin main
+Copy
+Important Notes
+
+Replace <username> and <repository> with your GitHub username and repository name.
+
+If the remote repository already contains files (e.g., a README), you may encounter conflicts. To resolve this, pull changes first:
+
+git pull origin main --allow-unrelated-histories
+Copy
+By following these steps, your local code will be successfully pushed to the existing GitHub repository.
