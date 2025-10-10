@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+pandas
+numpy
+scikit-learn
+joblib
+requests
+jinja2
+matplotlib.pyplot
+seaborn
+IPython.display
+joblib
+pickle
+os
+scikit-learn
+xgboost

@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SADC Financial Inclusion AI Dashboard</title>
+    <!-- Bootstrap CDN for layout and components -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Plotly CDN for Interactive Charts -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+    <!-- Custom Light Theme Styles with SADC Blue Accents -->
+    <style>
+        :root {
+            /* Light Theme Base Colors */
+            --bs-light-bg: #f4f7f9; /* Soft background */
+            --bs-card-bg: #ffffff;
+            --bs-dark-text: #333333;
+            
+            /* SADC Accent Colors (Retained) */
+            --bs-blue-accent: #1e90ff; /* SADC Blue Accent */
+            --bs-blue-light: #007bff; /* Standard light blue */
+            --bs-secondary-green: #00a651; /* SADC Green for secondary metrics */
+        }
+        body {
+            background-color: var(--bs-light-bg) !important;
+            color: var(--bs-dark-text);
+            font-family: 'Inter', sans-serif;
+        }
+        .header-title {
+            color: var(--bs-blue-accent);
+            font-weight: 700;
+            border-bottom: 2px solid var(--bs-blue-accent);
+            padding-bottom: 1rem;
+        }
+        /* Custom card styling */
+        .card.metric-card, .card.chart-card, .card.insight-card {
+            background-color: var(--bs-card-bg);
+            border: 1px solid #dee2e6; /* Light border */
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            height: 100%;
+            /* Required for absolute positioning of the insight card overlay */
+            position: relative; 
+        }
+        .card-header {
+            background-color: #e9ecef; /* Light gray header */
+            border-bottom: 1px solid #dee2e6;
+            font-weight: 600;
+            color: var(--bs-dark-text);
+        }
+        /* Metric cards */
+        .metric-card .card-title {
+            color: var(--bs-blue-accent);
+            font-size: 2.5rem;
+        }
+        /* Overriding Bootstrap primary/success/info for light theme accents */
+        /* Using light backgrounds with strong colored borders/accents */
+        .metric-card.bg-primary {
+            background-color: #e6f3ff !important; /* Very light blue background */
+            border-color: var(--bs-blue-accent) !important;
+        }
+        .metric-card.bg-success {
+            background-color: #e6ffe6 !important; /* Very light green background */
+            border-color: var(--bs-secondary-green) !important; 
+        }
+        .metric-card.bg-info {
+            background-color: #e0f7ff !important; /* Very light cyan background */
+            border-color: var(--bs-blue-light) !important;
+        }
+        
+        /* Insight Card Styling */
+        .insight-card .card-body {
+            border-left: 5px solid var(--bs-blue-accent); /* Blue accent line */
+        }
+        .insight-card h5 {
+            color: var(--bs-blue-light);
+            font-weight: 600;
+        }
+        .insight-card .card-header.bg-primary {
+            background-color: var(--bs-blue-accent) !important;
+            color: white !important;
+        }
+        .insight-card .card-header.bg-success {
+            background-color: var(--bs-secondary-green) !important;
+            color: white !important;
+        }
+        .insight-card .card-header.bg-info {
+            background-color: #00bcd4 !important; /* Custom Teal */
+            color: white !important;
+        }
+
+        /* Tab styling for light theme and blue accent */
+        .nav-tabs {
+            border-bottom: 1px solid #dee2e6;
+        }
+        .nav-tabs .nav-link {
+            color: #6c757d;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            transition: background-color 0.3s, color 0.3s;
+            padding: 10px 20px;
+        }
+        .nav-tabs .nav-link:hover {
+            color: var(--bs-blue-accent);
+            background-color: #e9ecef;
+            border-color: transparent;
+        }
+        .nav-tabs .nav-link.active {
+            color: var(--bs-blue-accent);
+            background-color: var(--bs-card-bg);
+            border-bottom: 3px solid var(--bs-blue-accent);
+            font-weight: bold;
+        }
+        
+        /* Plotly containers */
+        .chart-container {
+            min-height: 350px;
+            padding: 0 !important;
+        }
+/* Overlay Container Styles (.hover-insight) */
+.hover-insight {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    /* Using the accent blue for the hover overlay */
+    background-color: rgba(0, 77, 153, 0.95); /* Semi-transparent SADC Blue */
+    color: white;
+    padding: 20px;
+    border-radius: 12px;
+    
+    /* Hiding by default */
+    opacity: 0; 
+    visibility: hidden; 
+    pointer-events: none; /* Prevents blocking clicks when hidden */
+    transition: opacity 0.3s ease-in-out, visibility 0.3s ease-in-out;
+    z-index: 10; 
+}
+
+/* State to make overlay visible (triggered by JavaScript) */
+.hover-insight.insight-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto; /* Allows interaction with the X button when visible */
+}
+
+/* 'X' Close Button Styling */
+.close-insight {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 5px;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    z-index: 11; /* Ensure button is above the overlay */
+}
+.close-insight:hover {
+    opacity: 1;
+}
+        .hover-insight .insight-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        .hover-insight .insight-text {
+            font-size: 1rem;
+            line-height: 1.4;
+        }
+
+        
+    </style>
+    
+    <!-- IMPORTANT: The original reference to /static/styles.css is removed as it's not available in this context. -->
+    <!-- The content of the original script.js will be loaded via the FastAPI static path -->
+</head>
+<body>
+    <div class="container-fluid p-4">
+        <h1 class="text-center mb-5 header-title">SADC Financial Inclusion: Ensemble Model Analysis</h1>
+        
+        <!-- TAB NAVIGATION -->
+        <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="insights-tab" data-bs-toggle="tab" data-bs-target="#insights" type="button" role="tab" aria-controls="insights" aria-selected="true">
+                    Model Insights & Key Drivers
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="diagnostics-tab" data-bs-toggle="tab" data-bs-target="#diagnostics" type="button" role="tab" aria-controls="diagnostics" aria-selected="false">
+                    Diagnostics & Regional Trends
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="strategic-tab" data-bs-toggle="tab" data-bs-target="#strategic" type="button" role="tab" aria-controls="strategic" aria-selected="false">
+                    Strategic Policy Insights
+                </button>
+            </li>
+        </ul>
+
+        <!-- TAB CONTENT -->
+        <div class="tab-content" id="dashboardTabsContent">
+            
+            <!-- TAB 1: MODEL INSIGHTS & KEY DRIVERS -->
+            <div class="tab-pane fade show active" id="insights" role="tabpanel" aria-labelledby="insights-tab">
+                
+                <!-- ROW 1: METRIC CARDS & GAUGES -->
+                <div class="row mb-4 metric-row">
+                    
+                    <div class="col-md-3">
+                        <div class="card metric-card bg-primary">
+                            <div class="card-header">Model R² (CV Avg)</div>
+                            <div class="card-body">
+                                <h2 class="card-title">{{ metrics.r2_ensemble }}</h2>
+                                <p class="card-text">Overall Predictive Accuracy</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card bg-success">
+                            <div class="card-header">R² Gain Over OLS</div>
+                            <div class="card-body">
+                                <h2 class="card-title">+{{ metrics.r2_gain }}</h2>
+                                <p class="card-text">Absolute Improvement from ML</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card metric-card bg-info">
+                            <div class="card-header">Percentage Gain</div>
+                            <div class="card-body">
+                                <h2 class="card-title">{{ metrics.r2_gain_pct }}%</h2>
+                                <p class="card-text">Improvement % over Baseline</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card chart-card">
+                            <div class="card-header">Model Stability Gauge</div>
+                            <div class="card-body chart-container" id="chart-gauge"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Stability Check</p>
+                                <p class="insight-text">Stability scores above 70 indicate the model performs reliably across different SADC country subsets, confirming its robustness for regional policy use.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ROW 2: CORE ANALYSIS VISUALS (Importance, PDP, Comparison) -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card chart-card">
+                            <div class="card-header">1. Top Feature Importances</div>
+                            <div class="card-body chart-container" id="chart-importance"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Policy Driver Ranking</p>
+                                <p class="insight-text">Mobile Penetration is the dominant variable, followed closely by Agent Density, highlighting the need for widespread digital infrastructure and last-mile service points.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card chart-card">
+                            <div class="card-header">2. Partial Dependence Plot (PDP)</div>
+                            <div class="card-body chart-container" id="chart-pdp"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Diminishing Returns</p>
+                                <p class="insight-text">The impact of Mobile Penetration plateaus after 50%, suggesting policy emphasis should shift from mere adoption to transaction volume and quality of usage.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card chart-card">
+                            <div class="card-header">3. R² Ensemble vs. OLS Comparison</div>
+                            <div class="card-body chart-container" id="chart-r2-compare"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Model Superiority</p>
+                                <p class="insight-text">The significant R² gap confirms the ensemble model's ability to capture complex, non-linear relationships better than a simple linear model, leading to better predictions.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: DIAGNOSTICS & TRENDS -->
+            <div class="tab-pane fade" id="diagnostics" role="tabpanel" aria-labelledby="diagnostics-tab">
+
+                <!-- ROW 3: DIAGNOSTICS & TRENDS (Scatter, Trends) - Added g-4 for spacing -->
+                <div class="row mb-4 g-4"> 
+                    <div class="col-md-6">
+                        <div class="card chart-card">
+                            <div class="card-header">4. Predicted vs. Actual Outcomes (Botswana)</div>
+                            <div class="card-body chart-container" id="chart-pred-actual"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Prediction Accuracy</p>
+                                <p class="insight-text">Points close to the diagonal line show high accuracy for Botswana's observed saving rates, validating the model's performance for country-specific analysis.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-3">
+                        <div class="card chart-card">
+                            <div class="card-header">6. Feature Correlation with Target</div>
+                            <div class="card-body chart-container" id="chart-correlation"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Key Correlation</p>
+                                <p class="insight-text">Mobile account shares and Active Accounts show the strongest positive correlation with Formal Saving, confirming the primary policy levers are well-targeted.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <!-- ROW 4: DIAGNOSTICS (Correlation, Residuals, Country Comparison) - Added g-4 for spacing -->
+                <div class="row mb-4 g-4"> 
+
+
+                    <div class="col-md-6">
+                        <div class="card chart-card">
+                            <div class="card-header">8. Mobile Penetration vs. Formal Saving (Country Scatter)</div>
+                            <div class="card-body chart-container" id="chart-country-comp"></div>
+                            <div class="hover-insight">
+                                <button class="close-insight" aria-label="Close insight">X</button>
+                                <p class="insight-title">Regional Maturity</p>
+                                <p class="insight-text">Countries clustered in the top-right quadrant (e.g., South Africa) show that high mobile penetration strongly correlates with high formal saving maturity across the region.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- TAB 3: STRATEGIC POLICY INSIGHTS -->
+            <div class="tab-pane fade" id="strategic" role="tabpanel" aria-labelledby="strategic-tab">
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-4">
+                        <div class="card insight-card h-100">
+                            <div class="card-header bg-primary">Insight 1: Mobile-Led Formalization</div>
+                            <div class="card-body">
+                                <h5 class="card-title">Mobile Penetration is the Strongest Predictor</h5>
+                                <p class="card-text">
+                                    The model identifies **Mobile Penetration** (share of mobile money account holders) as the single most critical driver for increasing the formal saving rate in SADC. Policy efforts should continue to prioritize mobile money accessibility and adoption.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card insight-card h-100">
+                            <div class="card-header bg-success">Insight 2: Non-Linear Returns</div>
+                            <div class="card-body">
+                                <h5 class="card-title">Diminishing Impact at Saturation</h5>
+                                <p class="card-text">
+                                    The Partial Dependence Plot (PDP) suggests that while mobile penetration is crucial, its marginal impact on formal saving begins to **diminish once country penetration exceeds approximately 50%**. Future strategy must shift from pure adoption to optimizing usage.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card insight-card h-100">
+                            <div class="card-header bg-info">Insight 3: The Role of Infrastructure</div>
+                            <div class="card-body">
+                                <h5 class="card-title">Agent Density vs. Active Accounts</h5>
+                                <p class="card-text">
+                                    High **Agent Density** and a high ratio of **Active Accounts** are critical supporting factors. These indicators confirm that physical and transactional infrastructure is necessary to translate mobile account registration into habitual formal saving.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="card insight-card h-100">
+                            <div class="card-header bg-warning text-dark">Insight 4: Model Validation</div>
+                            <div class="card-body">
+                                <h5 class="card-title">Ensemble Approach Captures Complexity</h5>
+                                <p class="card-text">
+                                    The **${{ metrics.r2_gain_pct }}% R² gain** over the OLS baseline confirms that the ensemble model successfully captured complex, non-linear interactions between financial inclusion features, providing more reliable predictions for policy planning.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+        </div>
+
+    </div>
+    
+    <!-- Custom JavaScript for Charting -->
+    <script src="{{ url_for('static', path='/script.js') }}"></script>
+</body>
+</html>
