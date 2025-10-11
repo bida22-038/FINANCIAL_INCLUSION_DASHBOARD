@@ -124,7 +124,7 @@ async def get_dashboard_data():
 
     # --- 3. Predicted vs Actual (Scatter Plot) ---
     # filter for Botswana for illustrative purposes
-    df_botswana = df[df['country'] == 'Botswana'].copy()
+    df_botswana = df #[df['country'] == 'Botswana'].copy()
     
     if MODEL and not df_botswana.empty:
         X_pred = df_botswana[FEATURES]
