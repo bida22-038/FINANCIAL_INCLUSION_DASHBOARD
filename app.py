@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sklearn.inspection import partial_dependence
 import joblib
 import pandas as pd
 import numpy as np
@@ -88,6 +89,37 @@ def get_model_feature_importances(model, features):
         print(f"❌ Error during dynamic feature importance calculation: {e}")
         return None
 
+def get_pdp_data(model, X, feature_name):
+    """
+    Calculates the Partial Dependence values and formats them for the Plotly.js script.
+    """
+    try:
+        # Calculate the Partial Dependence values
+        pdp_results = partial_dependence(
+            estimator=model,
+            X=X,
+            features=[feature_name], 
+            kind='average',
+            grid_resolution=50       # 50 points gives a smooth plot
+        )
+
+        pdp_y = pdp_results.average_predictions[0]
+        pdp_x = pdp_results.values[0]
+
+        # Format the PDP values into the required [{x: val, y: val}, ...] structure
+        pdp_formatted = []
+        for x_val, y_val in zip(pdp_x, pdp_y):
+            # Convert numpy types to native Python types for JSON serialization
+            pdp_formatted.append({
+                'x': float(x_val), 
+                'y': float(y_val)
+            })
+            
+        return pdp_formatted
+    except Exception as e:
+        print(f"❌ Error during PDP calculation: {e}")
+        return None
+
 # --- API ENDPOINTS ---
 
 @app.get("/", response_class=HTMLResponse)
@@ -152,11 +184,22 @@ async def get_dashboard_data():
     corr_target = corr_matrix[TARGET_Y].drop(TARGET_Y).sort_values(ascending=False)
     corr_data = [{'feature': f.replace('_', ' ').title(), 'correlation': c} for f, c in corr_target.items()]
 
-    # --- 6. PDP Data (Simulated Non-Linear Curve - Line Chart) ---
-    pdp_points = [
-        {'x': 0, 'y': 0.10}, {'x': 10, 'y': 0.25}, {'x': 20, 'y': 0.35},
-        {'x': 30, 'y': 0.40}, {'x': 40, 'y': 0.42}, {'x': 50, 'y': 0.43}
-    ]
+    # --- 6. PDP Data (Non-Linear Curve - Line Chart) ---
+    KEY_PDP_FEATURE = FEATURES[0] 
+    pdp_points = []
+    
+    if MODEL and not df.empty:
+        pdp_data_array = get_pdp_data(MODEL, df[FEATURES], KEY_PDP_FEATURE)
+        if pdp_data_array:
+            pdp_points = pdp_data_array
+
+    # Fallback to a simple simulation if calculation fails
+    if not pdp_points:
+        pdp_points = [
+            {'x': 0, 'y': 0.10}, {'x': 10, 'y': 0.25}, {'x': 20, 'y': 0.35},
+            {'x': 30, 'y': 0.40}, {'x': 40, 'y': 0.42}, {'x': 50, 'y': 0.43}
+        ]
+
     
     # --- 7. Residuals Distribution (Histogram) ---
     if 'predicted' in df_botswana.columns:

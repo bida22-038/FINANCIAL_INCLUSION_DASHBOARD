@@ -54,7 +54,8 @@ async function fetchDashboardData() {
 
         // Draw all 8 visualizations
         drawFeatureImportance(data.feature_importance); // 1. Bar Chart
-        drawPDP(data.pdp_data);                         // 2. Line Chart
+        // PASS THE DYNAMIC FEATURE NAME TO DRAWPDP
+        drawPDP(data.pdp_data, data.pdp_feature_name); // 2. Line Chart
         drawR2Comparison();                             // 3. Bar Chart (Data from Jinja context)
         drawPredVsActual(data.pred_actual);             // 4. Scatter Plot
     
@@ -97,7 +98,7 @@ function drawFeatureImportance(data) {
 }
 
 // 2. Partial Dependence Plot (Line Chart)
-function drawPDP(data) {
+function drawPDP(data, featureName = 'Mobile Penetration') {
     const x = data.map(d => d.x);
     const y = data.map(d => d.y);
 
@@ -108,8 +109,9 @@ function drawPDP(data) {
     };
 
     const layout = {
-        title: { text: 'Saving Rate vs. Mobile Penetration' },
-        xaxis: { title: 'Mobile Penetration (%)' },
+        // Use the actual feature name for the title and X-axis label
+        title: { text: `Predicted Saving Rate vs. ${featureName}` }, 
+        xaxis: { title: `${featureName} (%)` },
         yaxis: { title: 'Predicted Formal Saving Rate' },
         height: 350
     };
