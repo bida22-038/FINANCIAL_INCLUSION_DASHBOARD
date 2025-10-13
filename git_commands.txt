@@ -44,3 +44,110 @@ If the remote repository already contains files (e.g., a README), you may encoun
 git pull origin main --allow-unrelated-histories
 Copy
 By following these steps, your local code will be successfully pushed to the existing GitHub repository.
+
+@app.get("/", response_class=HTMLResponse)
+async def serve_dashboard(request: Request):
+    """Renders the main dashboard page."""
+    return templates.TemplateResponse("index.html", {"request": request, "metrics": METRICS})
+
+@app.get("/api/dashboard_data")
+async def get_dashboard_data():
+    """Provides the JSON data for all frontend visualizations."""
+    
+    if DF_FULL is None:
+        return {"error": "Data not available."}
+
+    df = DF_FULL.copy().dropna(subset=[TARGET_Y] + FEATURES)
+
+    # --- 1. Feature Importance Data (Bar Chart) ---
+    feature_importance_data = None
+    
+    if MODEL:
+        feature_importance_data = get_model_feature_importances(MODEL, FEATURES)
+
+    # Fallback to simulated data if model is not loaded or importance extraction failed
+    if not feature_importance_data:
+        feature_importance_data = [
+            {'feature': 'Mobile Penetration', 'importance': 0.38, 'color': '#28a745'},
+            {'feature': 'Agent Density', 'importance': 0.22, 'color': '#17a2b8'},
+            {'feature': 'Active Accounts', 'importance': 0.15, 'color': '#ffc107'},
+            {'feature': 'Formal Account Share', 'importance': 0.10, 'color': '#6c757d'},
+            {'feature': 'Mobile-to-Formal Ratio', 'importance': 0.08, 'color': '#dc3545'}
+        ]
+    
+
+    df_botswana = df #[df['country'] == 'Botswana'].copy()
+    
+    if MODEL and not df_botswana.empty:
+        X_pred = df_botswana[FEATURES]
+        try:
+            df_botswana['predicted'] = MODEL.predict(X_pred)
+            pred_actual_data = {
+                'actual': df_botswana[TARGET_Y].tolist(),
+                'predicted': df_botswana['predicted'].tolist(),
+                'years': df_botswana['year'].tolist()
+            }
+        except Exception as e:
+             print(f"Prediction failed: {e}")
+             pred_actual_data = {'actual': [], 'predicted': [], 'years': []}
+    else:
+        pred_actual_data = {'actual': [], 'predicted': [], 'years': []}
+    
+    # --- 4. SADC Trends (Botswana vs. SADC Avg Mobile Penetration - Line Chart) ---
+    df_sadc_avg = df.groupby('year')['mobile_account_share'].mean().reset_index().rename(columns={'mobile_account_share': 'SADC_Avg'})
+    df_bots = df[df['country'] == 'Botswana'].rename(columns={'mobile_account_share': 'Botswana'})
+    
+    trend_data = pd.merge(df_bots[['year', 'Botswana']], df_sadc_avg, on='year', how='inner')
+    
+    # --- 5. Correlation Heatmap Data (Bar Chart) ---
+    corr_matrix = df[[TARGET_Y] + FEATURES].corr()
+    corr_target = corr_matrix[TARGET_Y].drop(TARGET_Y).sort_values(ascending=False)
+    corr_data = [{'feature': f.replace('_', ' ').title(), 'correlation': c} for f, c in corr_target.items()]
+
+    # --- 6. PDP Data (Non-Linear Curve - Line Chart) ---
+    KEY_PDP_FEATURE = 'mobile_account_share' 
+    pdp_points = []
+    
+    if MODEL and not df.empty:
+        
+        pdp_data_array = get_pdp_data(MODEL, df[FEATURES], KEY_PDP_FEATURE) 
+        if pdp_data_array:
+            pdp_points = pdp_data_array
+
+    # Fallback to a simple simulation if calculation fails
+    if not pdp_points:
+        pdp_points = [
+            {'x': 0, 'y': 0.10}, {'x': 10, 'y': 0.25}, {'x': 20, 'y': 0.35},
+            {'x': 30, 'y': 0.40}, {'x': 40, 'y': 0.42}, {'x': 50, 'y': 0.43}
+        ]
+
+    
+    # --- 7. Residuals Distribution (Histogram) ---
+    if 'predicted' in df_botswana.columns:
+        # Use the specific country data (Botswana) for residuals
+        residuals = (df_botswana[TARGET_Y] - df_botswana['predicted']).tolist() 
+    else:
+        residuals = []
+        
+    # --- 5. Country Comparison: Top Predictor vs. Target (Scatter) ---
+    # Renumbering this section as per the new structure
+    df_comp = df.groupby('country')[['mobile_account_share', TARGET_Y]].mean().reset_index()
+    comp_data = [{'country': r.country, 'x': r.mobile_account_share, 'y': r.saved_formal}
+                 for r in df_comp.itertuples()]
+    # --- 8. Country Comparison: Top Predictor vs. Target (Scatter) ---
+    df_comp = df.groupby('country').agg(
+        mobile_pen=(FEATURES[0], 'mean'),
+        formal_saving=(TARGET_Y, 'mean')
+    ).reset_index().sample(n=min(10, len(df.country.unique())), random_state=42) # Sample 10 countries
+    
+    country_comp_data = df_comp.to_dict('records')
+    
+    return {
+        "feature_importance": feature_importance_data,
+        "pred_actual": pred_actual_data,
+       
+        "correlation": corr_data,
+        "pdp_data": pdp_points,
+   
+        "country_comparison": country_comp_data
+    }
